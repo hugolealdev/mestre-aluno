@@ -2,7 +2,10 @@
   "name": "mestre-aluno",
   "private": true,
   "version": "0.1.0",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@9.15.2",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "build": "pnpm --filter @mestre-aluno/api build && pnpm --filter @mestre-aluno/web build",
     "dev": "pnpm --parallel --filter @mestre-aluno/api dev --filter @mestre-aluno/web dev",
@@ -12,4 +15,3 @@
     "prisma:studio": "pnpm --filter @mestre-aluno/api prisma:studio"
   }
 }
-
