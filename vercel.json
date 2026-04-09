@@ -1,7 +1,6 @@
 {
   "framework": "vite",
-  "installCommand": "pnpm install --frozen-lockfile=false",
-  "buildCommand": "pnpm --filter @mestre-aluno/web build",
-  "outputDirectory": "apps/web/dist"
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
 }
-
