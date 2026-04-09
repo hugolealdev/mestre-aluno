@@ -1,0 +1,405 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  PENDING_CLOSURE
+}
+
+enum VerificationStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PlanTier {
+  FREE
+  PRO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  INCOMPLETE
+  TRIALING
+}
+
+enum LessonStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+  RESCHEDULE_PENDING
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  CANCELED
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  LESSON
+  CONTENT
+  VERIFICATION
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  ANSWERED
+  CLOSED
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  DISABLED
+}
+
+enum RescheduleStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id                    String                @id @default(cuid())
+  email                 String                @unique
+  passwordHash          String
+  stripeCustomerId      String?               @unique
+  role                  Role
+  status                UserStatus            @default(ACTIVE)
+  fullName              String
+  phone                 String?
+  cpf                   String?
+  avatarPath            String?
+  headline              String?
+  bio                   String?
+  city                  String?
+  state                 String?
+  postalCode            String?
+  addressLine1          String?
+  addressLine2          String?
+  verificationStatus    VerificationStatus    @default(NONE)
+  isVerified            Boolean               @default(false)
+  hashedRefreshToken    String?
+  googleRefreshToken    String?
+  closeAtPeriodEnd      Boolean               @default(false)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  teacherProfile        TeacherProfile?
+  studentProfile        StudentProfile?
+  sentSupportMessages   SupportMessage[]      @relation("SentSupportMessages")
+  supportTickets        SupportTicket[]       @relation("SupportTicketOwner")
+  taughtLessons         Lesson[]              @relation("TeacherLessons")
+  studentLessons        Lesson[]              @relation("StudentLessons")
+  teacherAvailabilities TeacherAvailability[]
+  publishedContents     Content[]
+  contentPurchases      ContentPurchase[]
+  subscriptions         Subscription[]
+  verificationRequests  VerificationRequest[]
+  createdTasks          Task[]                @relation("TeacherTasks")
+  assignedTasks         Task[]
+  taskSubmissions       TaskSubmission[]
+  teacherLinks          TeacherStudentLink[]  @relation("TeacherLink")
+  studentLinks          TeacherStudentLink[]  @relation("StudentLink")
+  auditLogs             AuditLog[]            @relation("ActorAuditLogs")
+  payments              Payment[]
+}
+
+model TeacherProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  documentPath    String?
+  specialties     String[]
+  publicSlug      String   @unique
+  averageRating   Decimal  @default(0) @db.Decimal(5, 2)
+  totalReviews    Int      @default(0)
+  totalLessons    Int      @default(0)
+  publicBasePrice Decimal? @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StudentProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  educationLevel  String?
+  schoolName      String?
+  studyGoal       String?
+  futureInterests String?
+  notesAverage    Decimal  @default(0) @db.Decimal(5, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TeacherStudentLink {
+  id        String   @id @default(cuid())
+  teacherId String
+  studentId String
+  createdAt DateTime @default(now())
+  teacher   User     @relation("TeacherLink", fields: [teacherId], references: [id], onDelete: Cascade)
+  student   User     @relation("StudentLink", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, studentId])
+}
+
+model TeacherAvailability {
+  id        String   @id @default(cuid())
+  teacherId String
+  weekday   Int
+  startTime String
+  endTime   String
+  timezone  String   @default("America/Sao_Paulo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  teacher   User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+}
+
+model Lesson {
+  id                    String             @id @default(cuid())
+  teacherId             String
+  studentId             String
+  subject               String
+  topic                 String?
+  startAt               DateTime
+  endAt                 DateTime
+  status                LessonStatus       @default(SCHEDULED)
+  stripeCheckoutId      String?            @unique
+  paymentStatus         PaymentStatus      @default(PENDING)
+  priceAmount           Decimal            @db.Decimal(10, 2)
+  refundEligible        Boolean            @default(false)
+  googleCalendarEventId String?
+  googleMeetUrl         String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  teacher               User               @relation("TeacherLessons", fields: [teacherId], references: [id], onDelete: Cascade)
+  student               User               @relation("StudentLessons", fields: [studentId], references: [id], onDelete: Cascade)
+  rescheduleRequests    LessonReschedule[]
+  tasks                 Task[]
+  payments              Payment[]
+}
+
+model LessonReschedule {
+  id            String           @id @default(cuid())
+  lessonId      String
+  requestedById String
+  oldStartAt    DateTime
+  oldEndAt      DateTime
+  newStartAt    DateTime
+  newEndAt      DateTime
+  status        RescheduleStatus @default(PENDING)
+  reason        String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  lesson        Lesson           @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+}
+
+model Content {
+  id           String            @id @default(cuid())
+  teacherId    String
+  title        String
+  description  String
+  preview      String
+  status       ContentStatus     @default(DRAFT)
+  priceAmount  Decimal           @db.Decimal(10, 2)
+  filePath     String
+  fileMimeType String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  teacher      User              @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  purchases    ContentPurchase[]
+}
+
+model ContentPurchase {
+  id               String        @id @default(cuid())
+  contentId        String
+  studentId        String
+  stripeCheckoutId String?       @unique
+  paymentStatus    PaymentStatus @default(PENDING)
+  paidAmount       Decimal       @db.Decimal(10, 2)
+  snapshotTitle    String
+  snapshotPreview  String
+  snapshotFilePath String
+  createdAt        DateTime      @default(now())
+  content          Content       @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  student          User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  payments         Payment[]
+}
+
+model Task {
+  id          String           @id @default(cuid())
+  teacherId   String
+  studentId   String
+  lessonId    String?
+  title       String
+  description String?
+  dueAt       DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  teacher     User             @relation("TeacherTasks", fields: [teacherId], references: [id], onDelete: Cascade)
+  student     User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lesson      Lesson?          @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  questions   TaskQuestion[]
+  submissions TaskSubmission[]
+}
+
+model TaskQuestion {
+  id        String   @id @default(cuid())
+  taskId    String
+  prompt    String
+  inputType String
+  sortOrder Int
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model TaskSubmission {
+  id          String       @id @default(cuid())
+  taskId      String
+  studentId   String
+  submittedAt DateTime?
+  score       Decimal?     @db.Decimal(5, 2)
+  feedback    String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  student     User         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers     TaskAnswer[]
+}
+
+model TaskAnswer {
+  id           String         @id @default(cuid())
+  submissionId String
+  questionId   String
+  answerText   String
+  createdAt    DateTime       @default(now())
+  submission   TaskSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}
+
+model SupportTicket {
+  id          String           @id @default(cuid())
+  ownerId     String
+  subject     String
+  description String
+  status      TicketStatus     @default(OPEN)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  owner       User             @relation("SupportTicketOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  messages    SupportMessage[]
+}
+
+model SupportMessage {
+  id        String        @id @default(cuid())
+  ticketId  String
+  senderId  String
+  body      String
+  createdAt DateTime      @default(now())
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender    User          @relation("SentSupportMessages", fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model VerificationRequest {
+  id                 String             @id @default(cuid())
+  userId             String
+  paymentId          String?
+  documentPath       String
+  selfieDocumentPath String
+  status             VerificationStatus @default(PENDING)
+  rejectionReason    String?
+  resendDeadlineAt   DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String
+  role                 Role
+  tier                 PlanTier
+  status               SubscriptionStatus @default(INCOMPLETE)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?            @unique
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id                    String           @id @default(cuid())
+  userId                String
+  lessonId              String?
+  contentPurchaseId     String?
+  stripeCheckoutId      String?          @unique
+  stripePaymentIntentId String?          @unique
+  type                  PaymentType
+  status                PaymentStatus    @default(PENDING)
+  amount                Decimal          @db.Decimal(10, 2)
+  currency              String           @default("BRL")
+  metadataJson          Json?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson                Lesson?          @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  contentPurchase       ContentPurchase? @relation(fields: [contentPurchaseId], references: [id], onDelete: SetNull)
+}
+
+model ModuleToggle {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PlatformSetting {
+  id            String   @id @default(cuid())
+  platformName  String   @default("Mestre Aluno")
+  officialEmail String?
+  logoPath      String?
+  iconPath      String?
+  primaryColor  String?  @default("#2563eb")
+  legalDocument String?
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  payload    Json?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("ActorAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+}

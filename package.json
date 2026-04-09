@@ -1,0 +1,15 @@
+{
+  "name": "mestre-aluno",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "pnpm --filter @mestre-aluno/api build && pnpm --filter @mestre-aluno/web build",
+    "dev": "pnpm --parallel --filter @mestre-aluno/api dev --filter @mestre-aluno/web dev",
+    "lint": "pnpm --filter @mestre-aluno/api lint && pnpm --filter @mestre-aluno/web lint",
+    "prisma:generate": "pnpm --filter @mestre-aluno/api prisma:generate",
+    "prisma:migrate": "pnpm --filter @mestre-aluno/api prisma:migrate",
+    "prisma:studio": "pnpm --filter @mestre-aluno/api prisma:studio"
+  }
+}
+

@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: mestre-aluno-api
+    runtime: node
+    rootDir: apps/api
+    plan: starter
+    buildCommand: pnpm install --frozen-lockfile=false && pnpm prisma:generate && pnpm build
+    startCommand: pnpm start:prod
+    healthCheckPath: /api/health
