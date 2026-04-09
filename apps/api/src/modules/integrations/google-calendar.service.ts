@@ -23,13 +23,46 @@ export class GoogleCalendarService {
     const clientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
     const redirectUri = this.configService.get<string>('GOOGLE_REDIRECT_URI');
 
-    if (!clientId || !clientSecret || !redirectUri || !refreshToken) {
+    if (!clientId || !clientSecret || !redirectUri) {
       return null;
     }
 
     const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-    oauth2Client.setCredentials({ refresh_token: refreshToken });
+
+    if (refreshToken) {
+      oauth2Client.setCredentials({ refresh_token: refreshToken });
+    }
+
     return oauth2Client;
+  }
+
+  createAuthorizationUrl(state: string) {
+    const auth = this.buildOAuthClient();
+
+    if (!auth) {
+      throw new Error('Credenciais Google OAuth não configuradas.');
+    }
+
+    return auth.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      state,
+      scope: [
+        'https://www.googleapis.com/auth/calendar',
+        'https://www.googleapis.com/auth/calendar.events'
+      ]
+    });
+  }
+
+  async exchangeCodeForRefreshToken(code: string) {
+    const auth = this.buildOAuthClient();
+
+    if (!auth) {
+      throw new Error('Credenciais Google OAuth não configuradas.');
+    }
+
+    const { tokens } = await auth.getToken(code);
+    return tokens.refresh_token ?? null;
   }
 
   async createLessonEvent(input: CreateLessonEventInput, refreshToken?: string) {

@@ -135,6 +135,12 @@ type PlatformSettings = {
   legalDocument?: string | null;
 };
 
+type IntegrationStatus = {
+  provider: string;
+  connected: boolean;
+  role: string;
+};
+
 type SupportTicket = {
   id: string;
   subject: string;
@@ -294,9 +300,18 @@ export function DashboardPage() {
 
   useEffect(() => {
     const teacherId = searchParams.get('teacherId');
+    const googleStatus = searchParams.get('google');
 
     if (teacherId) {
       setLessonTeacherId(teacherId);
+    }
+
+    if (googleStatus === 'connected') {
+      setStatusMessage('Google Calendar conectado com sucesso.');
+    }
+
+    if (googleStatus === 'error') {
+      setStatusMessage('Falha ao conectar Google Calendar.');
     }
   }, [searchParams]);
 
@@ -343,6 +358,22 @@ export function DashboardPage() {
       setStatusMessage(error instanceof Error ? error.message : 'Falha ao abrir portal.')
   });
 
+  const connectGoogleMutation = useMutation({
+    mutationFn: async () =>
+      apiRequest<{ url: string }>('/integrations/google/authorize', {
+        accessToken: token
+      }),
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: (error) =>
+      setStatusMessage(
+        error instanceof Error ? error.message : 'Falha ao iniciar conexão com Google.'
+      )
+  });
+
   const lessonsQuery = useQuery({
     queryKey: ['lessons', token],
     queryFn: async () =>
@@ -381,6 +412,15 @@ export function DashboardPage() {
         accessToken: token
       }),
     enabled: Boolean(token) && userQuery.data?.role === 'STUDENT'
+  });
+
+  const googleIntegrationQuery = useQuery({
+    queryKey: ['google-integration', token],
+    queryFn: async () =>
+      apiRequest<IntegrationStatus>('/integrations/google/status', {
+        accessToken: token
+      }),
+    enabled: Boolean(token) && userQuery.data?.role === 'TEACHER'
   });
 
   const dashboardPeriodQuery = buildDashboardPeriodQuery(dashboardStartDate, dashboardEndDate);
@@ -1095,6 +1135,30 @@ export function DashboardPage() {
                 <div className="rounded-2xl border border-slate-200 p-4">
                   <p className="text-sm text-slate-500">Conteúdos</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-900">{roleDashboardQuery.data.publishedContents}</p>
+                </div>
+              </div>
+              <div className="mt-5 rounded-2xl border border-slate-200 p-4">
+                <p className="text-sm font-medium text-slate-500">Google Calendar</p>
+                <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-900">
+                      {googleIntegrationQuery.data?.connected
+                        ? 'Conta Google conectada'
+                        : 'Conecte seu Google Calendar'}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {googleIntegrationQuery.data?.connected
+                        ? 'A plataforma já pode criar e atualizar eventos reais com Google Meet.'
+                        : 'A conexão é necessária para liberar criação automática de eventos e Meet nas aulas.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => connectGoogleMutation.mutate()}
+                    className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  >
+                    {googleIntegrationQuery.data?.connected ? 'Reconectar Google' : 'Conectar Google'}
+                  </button>
                 </div>
               </div>
               <div className="mt-5 grid gap-4 md:grid-cols-3">
